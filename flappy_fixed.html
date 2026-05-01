@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0a0a0f" />
+  <title>Game Box – Flappy Bird</title>
+
+  <!-- Telegram Web App SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ═══════════════════════════════════════════════════════════════
+       Game Box – Flappy Bird Web App
+       Dark neon-arcade aesthetic | Mobile-first
+       ═══════════════════════════════════════════════════════════════ */
+
+    /* ── Variables ─────────────────────────────────────────────────── */
+    :root {
+      --bg:         #0a0a0f;
+      --surface:    #12121a;
+      --surface2:   #1a1a26;
+      --border:     #2a2a3a;
+      --accent:     #00ffcc;
+      --accent2:    #ff4d94;
+      --accent3:    #7c5cfc;
+      --text:       #e8e8f0;
+      --text-dim:   #6a6a8a;
+      --danger:     #ff4444;
+      --gold:       #ffd700;
+      --silver:     #c0c0c0;
+      --bronze:     #cd7f32;
+
+      --font-main:  'Orbitron', sans-serif;
+      --font-mono:  'Share Tech Mono', monospace;
+
+      --radius:     12px;
+      --radius-lg:  20px;
+      --transition: 0.2s ease;
+
+      /* Safe area for Telegram */
+      --safe-top:    env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    /* ── Reset ──────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-main);
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    /* ── Screens ────────────────────────────────────────────────────── */
+    .screen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(20px);
+      transition: opacity 0.35s ease, transform 0.35s ease;
+      overflow: hidden;
+    }
+
+    .screen.active {
+      opacity: 1;
+      pointer-events: all;
+      transform: translateY(0);
+    }
+
+    /* ── Loading Screen ─────────────────────────────────────────────── */
+    #loading-screen {
+      background: var(--bg);
+      justify-content: center;
+      align-items: center;
+    }
+
+    .loading-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .logo-ring {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ring-svg {
+      position: absolute;
+      inset: 0;
+      animation: ring-spin 1.5s linear forwards;
+    }
+
+    @keyframes ring-spin {
+      from { stroke-dashoffset: 339; }
+      to   { stroke-dashoffset: 0; }
+    }
+
+    .ring-progress { stroke-linecap: round; }
+
+    .logo-icon {
+      font-size: 48px;
+      animation: pulse-icon 1s ease-in-out infinite alternate;
+    }
+
+    @keyframes pulse-icon {
+      from { transform: scale(1); }
+      to   { transform: scale(1.1); }
+    }
+
+    .logo-title {
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--accent3));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .loading-sub {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-dim);
+      animation: blink 1s step-end infinite;
+    }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* ── Background Grid ────────────────────────────────────────────── */
+    .bg-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,255,204,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,204,.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .scanline {
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.07) 2px,
+        rgba(0,0,0,0.07) 4px
+      );
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Home Screen ────────────────────────────────────────────────── */
+    #home-screen {
+      background: var(--bg);
+      padding-top: var(--safe-top);
+    }
+
+    .home-header {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .user-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 50px;
+      padding: 6px 14px 6px 6px;
+    }
+
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent3), var(--accent2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 900;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .user-info {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.2;
+    }
+
+    .user-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .user-score {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent);
+    }
+
+    .icon-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .icon-btn:active { transform: scale(0.92); background: var(--surface2); }
+
+    /* ── Home Main ──────────────────────────────────────────────────── */
+    .home-main {
+      position: relative;
+      z-index: 2;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 24px 40px;
+      gap: 28px;
+      overflow-y: auto;
+    }
+
+    .game-title-block {
+      text-align: center;
+    }
+
+    .pixel-bird-anim {
+      font-size: 56px;
+      display: block;
+      animation: fly 2s ease-in-out infinite;
+      filter: drop-shadow(0 0 20px rgba(0,255,204,0.5));
+    }
+
+    @keyframes fly {
+      0%, 100% { transform: translateY(0) rotate(-5deg); }
+      50%       { transform: translateY(-12px) rotate(5deg); }
+    }
+
+    .game-name {
+      font-size: 40px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      line-height: 1.1;
+      margin-top: 12px;
+      text-shadow: 0 0 30px rgba(0,255,204,0.3);
+    }
+
+    .game-name .accent {
+      color: var(--accent);
+      text-shadow: 0 0 20px var(--accent);
+    }
+
+    .game-desc {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-top: 10px;
+      line-height: 1.6;
+    }
+
+    /* ── Stats Row ──────────────────────────────────────────────────── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      width: 100%;
+      max-width: 360px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 10px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .accent-card {
+      border-color: var(--accent);
+      box-shadow: 0 0 16px rgba(0,255,204,0.15);
+    }
+
+    .stat-num {
+      font-size: 22px;
+      font-weight: 900;
+      color: var(--accent);
+      font-family: var(--font-mono);
+    }
+
+    .accent-card .stat-num { color: var(--accent); }
+
+    .stat-label {
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    /* ── Buttons ────────────────────────────────────────────────────── */
+    .play-btn {
+      width: 100%;
+      max-width: 300px;
+      padding: 18px 32px;
+      background: linear-gradient(135deg, var(--accent), #00ccaa);
+      color: #000;
+      border: none;
+      border-radius: var(--radius-lg);
+      font-family: var(--font-main);
+      font-size: 16px;
+      font-weight: 900;
+      letter-spacing: 3px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 0 30px rgba(0,255,204,0.4), 0 4px 20px rgba(0,0,0,0.4);
+      transition: all var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .play-btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(rgba(255,255,255,0.2), transparent);
+      border-radius: inherit;
+    }
+
+    .play-btn:active {
+      transform: scale(0.96);
+      box-shadow: 0 0 15px rgba(0,255,204,0.3);
+    }
+
+    .play-btn.small {
+      max-width: 140px;
+      padding: 14px 20px;
+      font-size: 13px;
+    }
+
+    .play-btn-icon { font-size: 18px; }
+
+    .secondary-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      color: var(--text-dim);
+      font-family: var(--font-main);
+      font-size: 13px;
+      letter-spacing: 1px;
+      padding: 12px 24px;
+      cursor: pointer;
+      transition: all var(--transition);
+      width: 100%;
+      max-width: 300px;
+    }
+
+    .secondary-btn:active {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .secondary-btn.small {
+      max-width: 140px;
+      padding: 12px 16px;
+    }
+
+    /* ── Game Screen ────────────────────────────────────────────────── */
+    #game-screen {
+      background: #000;
+    }
+
+    #game-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    .game-hud {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 16px;
+      padding-top: calc(16px + var(--safe-top));
+      pointer-events: none;
+    }
+
+    .game-hud > * { pointer-events: all; }
+
+    .hud-back {
+      background: rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all var(--transition);
+    }
+
+    .hud-back:active { transform: scale(0.9); }
+
+    .hud-score {
+      font-size: 32px;
+      font-weight: 900;
+      color: #fff;
+      text-shadow: 0 2px 12px rgba(0,0,0,0.8), 0 0 20px rgba(0,255,204,0.4);
+      font-family: var(--font-mono);
+      letter-spacing: 2px;
+    }
+
+    .hud-best {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: rgba(255,255,255,0.6);
+      text-align: right;
+      line-height: 1.4;
+      background: rgba(0,0,0,0.4);
+      padding: 6px 10px;
+      border-radius: 8px;
+    }
+
+    /* ── Overlay ────────────────────────────────────────────────────── */
+    .overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      transition: opacity 0.3s ease;
+    }
+
+    .overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* ── Countdown ──────────────────────────────────────────────────── */
+    .countdown-num {
+      font-size: 100px;
+      font-weight: 900;
+      color: var(--accent);
+      text-shadow: 0 0 40px var(--accent);
+      font-family: var(--font-mono);
+      animation: pop 0.6s ease;
+    }
+
+    @keyframes pop {
+      0%   { transform: scale(1.5); opacity: 0; }
+      50%  { transform: scale(0.9); }
+      100% { transform: scale(1);   opacity: 1; }
+    }
+
+    /* ── Game Over Card ─────────────────────────────────────────────── */
+    .gameover-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 32px 28px;
+      text-align: center;
+      width: calc(100% - 48px);
+      max-width: 320px;
+      box-shadow: 0 0 60px rgba(0,0,0,0.8);
+      animation: slide-up 0.4s ease;
+    }
+
+    @keyframes slide-up {
+      from { transform: translateY(40px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+
+    .gameover-icon { font-size: 48px; margin-bottom: 12px; }
+
+    .gameover-title {
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      color: var(--accent2);
+      text-shadow: 0 0 20px var(--accent2);
+      margin-bottom: 24px;
+    }
+
+    .gameover-scores {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      background: var(--surface2);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    .go-stat {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .go-divider {
+      width: 1px;
+      height: 40px;
+      background: var(--border);
+      margin: 0 16px;
+    }
+
+    .go-label {
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+
+    .go-num {
+      font-size: 36px;
+      font-weight: 900;
+      color: var(--accent);
+      font-family: var(--font-mono);
+    }
+
+    .new-record {
+      background: linear-gradient(135deg, var(--gold), #ffaa00);
+      color: #000;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin-bottom: 20px;
+      animation: glow-gold 1s ease-in-out infinite alternate;
+    }
+
+    .new-record.hidden { display: none; }
+
+    @keyframes glow-gold {
+      from { box-shadow: 0 0 10px rgba(255,215,0,0.5); }
+      to   { box-shadow: 0 0 25px rgba(255,215,0,0.9); }
+    }
+
+    .gameover-btns {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-bottom: 16px;
+    }
+
+    .saving-indicator {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-dim);
+      animation: blink 1s step-end infinite;
+      min-height: 16px;
+      display: none;
+    }
+
+    /* ── Leaderboard Screen ─────────────────────────────────────────── */
+    #leaderboard-screen {
+      background: var(--bg);
+      padding-top: var(--safe-top);
+    }
+
+    .screen-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .back-btn {
+      background: none;
+      border: none;
+      color: var(--accent);
+      font-family: var(--font-main);
+      font-size: 14px;
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    .screen-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 2px;
+    }
+
+    .lb-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .lb-loading {
+      text-align: center;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      padding: 40px;
+      animation: blink 1s step-end infinite;
+    }
+
+    .lb-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      transition: all var(--transition);
+      animation: slide-in 0.3s ease both;
+    }
+
+    @keyframes slide-in {
+      from { transform: translateX(-20px); opacity: 0; }
+      to   { transform: translateX(0);     opacity: 1; }
+    }
+
+    .lb-row.rank-1 { border-color: var(--gold);   box-shadow: 0 0 16px rgba(255,215,0,0.15); }
+    .lb-row.rank-2 { border-color: var(--silver); box-shadow: 0 0 12px rgba(192,192,192,0.1); }
+    .lb-row.rank-3 { border-color: var(--bronze); box-shadow: 0 0 12px rgba(205,127,50,0.1); }
+    .lb-row.rank-me { border-color: var(--accent); box-shadow: 0 0 16px rgba(0,255,204,0.15); }
+
+    .lb-rank {
+      font-size: 22px;
+      width: 36px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .lb-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent3), var(--accent2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .lb-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+    .lb-info { flex: 1; overflow: hidden; }
+
+    .lb-name {
+      font-size: 14px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .lb-games {
+      font-size: 11px;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+
+    .lb-score {
+      font-size: 20px;
+      font-weight: 900;
+      color: var(--accent);
+      font-family: var(--font-mono);
+      flex-shrink: 0;
+    }
+
+    /* ── Utilities ──────────────────────────────────────────────────── */
+    .hidden { display: none !important; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* ── Responsive tweaks ──────────────────────────────────────────── */
+    @media (max-height: 640px) {
+      .pixel-bird-anim { font-size: 40px; }
+      .game-name { font-size: 32px; }
+      .home-main { gap: 18px; padding-bottom: 24px; }
+    }
+
+    @media (min-width: 480px) {
+      .gameover-card { padding: 40px 36px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Loading Screen ─────────────────────────────────────────────────── -->
+  <div id="loading-screen" class="screen active">
+    <div class="loading-content">
+      <div class="logo-ring">
+        <svg viewBox="0 0 120 120" class="ring-svg">
+          <circle cx="60" cy="60" r="54" fill="none" stroke="#00ffcc" stroke-width="3"
+                  stroke-dasharray="339" stroke-dashoffset="339" class="ring-progress" />
+        </svg>
+        <span class="logo-icon">🎮</span>
+      </div>
+      <h1 class="logo-title">GAME BOX</h1>
+      <p class="loading-sub">Initializing...</p>
+    </div>
+  </div>
+
+  <!-- ── Home Screen ────────────────────────────────────────────────────── -->
+  <div id="home-screen" class="screen">
+    <div class="bg-grid"></div>
+    <div class="scanline"></div>
+
+    <header class="home-header">
+      <div class="user-chip" id="user-chip">
+        <div class="avatar" id="user-avatar">?</div>
+        <div class="user-info">
+          <span class="user-name" id="user-name-display">Player</span>
+          <span class="user-score">🏆 <span id="user-highscore">0</span></span>
+        </div>
+      </div>
+      <button class="icon-btn" id="leaderboard-btn" title="Leaderboard">🏅</button>
+    </header>
+
+    <main class="home-main">
+      <div class="game-title-block">
+        <div class="pixel-bird-anim">🐦</div>
+        <h2 class="game-name">FLAPPY<br/><span class="accent">BIRD</span></h2>
+        <p class="game-desc">Tap to fly. Dodge the pipes.<br/>Beat your high score.</p>
+      </div>
+
+      <div class="stats-row" id="stats-row">
+        <div class="stat-card">
+          <span class="stat-num" id="stat-games">0</span>
+          <span class="stat-label">Games</span>
+        </div>
+        <div class="stat-card accent-card">
+          <span class="stat-num" id="stat-best">0</span>
+          <span class="stat-label">Best</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-num" id="stat-total">0</span>
+          <span class="stat-label">Total Score</span>
+        </div>
+      </div>
+
+      <button class="play-btn" id="play-btn">
+        <span class="play-btn-icon">▶</span>
+        <span>PLAY NOW</span>
+      </button>
+
+      <button class="secondary-btn" id="leaderboard-page-btn">🏅 Leaderboard</button>
+    </main>
+  </div>
+
+  <!-- ── Game Screen ────────────────────────────────────────────────────── -->
+  <div id="game-screen" class="screen">
+    <div class="game-hud">
+      <button class="hud-back" id="game-back-btn">✕</button>
+      <div class="hud-score" id="hud-score">0</div>
+      <div class="hud-best" id="hud-best-wrapper">BEST <span id="hud-best">0</span></div>
+    </div>
+
+    <canvas id="game-canvas"></canvas>
+
+    <div id="countdown-overlay" class="overlay hidden">
+      <div class="countdown-num" id="countdown-num">3</div>
+    </div>
+
+    <div id="gameover-overlay" class="overlay hidden">
+      <div class="gameover-card">
+        <div class="gameover-icon">💀</div>
+        <h2 class="gameover-title">GAME OVER</h2>
+        <div class="gameover-scores">
+          <div class="go-stat">
+            <span class="go-label">Score</span>
+            <span class="go-num" id="go-score">0</span>
+          </div>
+          <div class="go-divider"></div>
+          <div class="go-stat">
+            <span class="go-label">Best</span>
+            <span class="go-num" id="go-best">0</span>
+          </div>
+        </div>
+        <div class="new-record hidden" id="new-record-badge">🎉 NEW RECORD!</div>
+        <div class="gameover-btns">
+          <button class="play-btn small" id="restart-btn">↺ RETRY</button>
+          <button class="secondary-btn small" id="go-home-btn">⌂ HOME</button>
+        </div>
+        <div class="saving-indicator" id="saving-indicator">Saving score...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Leaderboard Screen ─────────────────────────────────────────────── -->
+  <div id="leaderboard-screen" class="screen">
+    <div class="screen-header">
+      <button class="back-btn" id="lb-back-btn">← Back</button>
+      <h2 class="screen-title">🏅 Leaderboard</h2>
+    </div>
+    <div class="lb-list" id="lb-list">
+      <div class="lb-loading">Loading...</div>
+    </div>
+  </div>
+
+  <!-- JavaScript Modules (inline to have full standalone) -->
+  <script>
+    // ----------------------------------------------
+    // Game Box - Flappy Bird (Full integration)
+    // No external dependencies except Telegram API
+    // ----------------------------------------------
+    (function(){
+      // ======================== UTILS & HELPERS ========================
+      const tg = window.Telegram?.WebApp;
+      if(tg) {
+        tg.expand();
+        tg.enableClosingConfirmation();
+        tg.setBackgroundColor("#0a0a0f");
+        tg.setHeaderColor("bg_color");
+      }
+
+      // --- DOM Elements ---
+      const screens = {
+        loading: document.getElementById('loading-screen'),
+        home: document.getElementById('home-screen'),
+        game: document.getElementById('game-screen'),
+        leaderboard: document.getElementById('leaderboard-screen')
+      };
+      function showScreen(screenId) {
+        for(let [id, el] of Object.entries(screens)) if(el) el.classList.remove('active');
+        screens[screenId]?.classList.add('active');
+      }
+
+      // Simple player stats (mock localStorage)
+      let playerStats = {
+        name: "Player",
+        highScore: 0,
+        totalScore: 0,
+        gamesPlayed: 0,
+        avatarInitial: "P"
+      };
+      function loadStats() {
+        try {
+          const saved = localStorage.getItem("flappy_stats");
+          if(saved) {
+            const data = JSON.parse(saved);
+            playerStats = { ...playerStats, ...data };
+          }
+          if(tg && tg.initDataUnsafe?.user) {
+            const u = tg.initDataUnsafe.user;
+            playerStats.name = u.first_name || (u.username ? `@${u.username}` : "Player");
+            playerStats.avatarInitial = (u.first_name ? u.first_name[0] : (u.username?u.username[0]:'P')).toUpperCase();
+            if(u.photo_url) playerStats.avatarUrl = u.photo_url;
+          }
+        } catch(e) {}
+        updateHomeStats();
+      }
+      function saveStats() {
+        localStorage.setItem("flappy_stats", JSON.stringify({
+          name: playerStats.name,
+          highScore: playerStats.highScore,
+          totalScore: playerStats.totalScore,
+          gamesPlayed: playerStats.gamesPlayed,
+          avatarInitial: playerStats.avatarInitial
+        }));
+      }
+      function updateHomeStats() {
+        document.getElementById('stat-games').innerText = playerStats.gamesPlayed;
+        document.getElementById('stat-best').innerText = playerStats.highScore;
+        document.getElementById('stat-total').innerText = playerStats.totalScore;
+        document.getElementById('user-highscore').innerText = playerStats.highScore;
+        document.getElementById('user-name-display').innerText = playerStats.name;
+        const avatarDiv = document.getElementById('user-avatar');
+        avatarDiv.innerHTML = playerStats.avatarUrl ? `<img src="${playerStats.avatarUrl}" alt="avatar"/>` : playerStats.avatarInitial;
+      }
+      function updateGameHighScoreUI(score) {
+        document.getElementById('hud-best').innerText = playerStats.highScore;
+        document.getElementById('go-best').innerText = playerStats.highScore;
+        if(score === playerStats.highScore && score>0) document.getElementById('new-record-badge')?.classList.remove('hidden');
+        else document.getElementById('new-record-badge')?.classList.add('hidden');
+      }
+      function addScoreToStats(currentScore) {
+        playerStats.gamesPlayed++;
+        playerStats.totalScore += currentScore;
+        let isNewRecord = false;
+        if(currentScore > playerStats.highScore) {
+          playerStats.highScore = currentScore;
+          isNewRecord = true;
+        }
+        saveStats();
+        updateHomeStats();
+        return isNewRecord;
+      }
+
+      // ======================== FLAPPY GAME ENGINE ========================
+      const canvas = document.getElementById('game-canvas');
+      let ctx = canvas.getContext('2d');
+      let gameRunning = false;
+      let animationId = null;
+      let score = 0;
+
+      // Game variables
+      let bird = { x: 80, y: 200, radius: 12, velocity: 0, gravity: 0.28, jumpPower: -5.2 };
+      let pipes = [];
+      const PIPE_WIDTH = 52;
+      const PIPE_GAP = 92;
+      const PIPE_SPACING = 135;
+      let frame = 0;
+      let lastPipeFrame = 0;
+      let groundY = 0;
+      let pipeSpeed = 3.8;
+
+      function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        groundY = canvas.height - 60;
+        bird.y = Math.min(bird.y, groundY - bird.radius);
+        drawGame(); // redraw static
+      }
+      window.addEventListener('resize', () => { resizeCanvas(); if(gameRunning) drawGame(); });
+
+      function resetGame() {
+        score = 0;
+        pipeSpeed = 3.8;
+        document.getElementById('hud-score').innerText = "0";
+        bird.y = canvas.height/2;
+        bird.velocity = 0;
+        pipes = [];
+        frame = 0;
+        lastPipeFrame = 0;
+        if(canvas) drawGame();
+      }
+
+      function addPipe() {
+        const minTop = 60;
+        const maxTop = groundY - PIPE_GAP - 60;
+        let topHeight = Math.floor(Math.random() * (maxTop - minTop + 1) + minTop);
+        pipes.push({
+          x: canvas.width,
+          topHeight: topHeight,
+          bottomY: topHeight + PIPE_GAP,
+          width: PIPE_WIDTH,
+          passed: false
+        });
+      }
+
+      function updateGame() {
+        if(!gameRunning) return;
+        // bird physics
+        bird.velocity += bird.gravity;
+        bird.y += bird.velocity;
+        // collision ground / ceiling
+        if(bird.y + bird.radius >= groundY || bird.y - bird.radius <= 0) {
+          gameOver();
+          return;
+        }
+        // pipes update & collision
+        for(let i=0; i<pipes.length; i++) {
+          const p = pipes[i];
+          p.x -= pipeSpeed;
+          // collision detection
+          if(bird.x + bird.radius > p.x && bird.x - bird.radius < p.x + p.width) {
+            if(bird.y - bird.radius < p.topHeight || bird.y + bird.radius > p.bottomY) {
+              gameOver();
+              return;
+            }
+          }
+          if(!p.passed && bird.x > p.x + p.width) {
+            p.passed = true;
+            score++;
+            document.getElementById('hud-score').innerText = score;
+            // Speed up every 5 points, cap at 6.5
+            if(score % 3 === 0) pipeSpeed = Math.min(pipeSpeed + 0.35, 8.0);
+          }
+        }
+        pipes = pipes.filter(p => p.x + PIPE_WIDTH > 0);
+        // pipe spawning
+        if(frame - lastPipeFrame >= PIPE_SPACING) {
+          addPipe();
+          lastPipeFrame = frame;
+        }
+        frame++;
+        drawGame();
+      }
+
+      function drawGame() {
+        if(!ctx) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // sky gradient
+        const grad = ctx.createLinearGradient(0,0,0,canvas.height);
+        grad.addColorStop(0,"#0a0f1a");
+        grad.addColorStop(1,"#101520");
+        ctx.fillStyle=grad;
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        // draw pipes
+        for(let p of pipes) {
+          ctx.fillStyle = "#22c55e";
+          ctx.shadowBlur=0;
+          ctx.fillRect(p.x, 0, p.width, p.topHeight);
+          ctx.fillRect(p.x, p.bottomY, p.width, canvas.height - p.bottomY);
+          ctx.fillStyle = "#15803d";
+          ctx.fillRect(p.x-8, p.topHeight-30, p.width+16, 30);
+          ctx.fillRect(p.x-8, p.bottomY, p.width+16, 30);
+        }
+        // ground
+        ctx.fillStyle = "#263325";
+        ctx.fillRect(0, groundY, canvas.width, canvas.height-groundY);
+        ctx.fillStyle = "#4ade80";
+        ctx.fillRect(0, groundY-6, canvas.width, 6);
+        // bird
+        ctx.save();
+        ctx.shadowBlur=12;
+        ctx.shadowColor="#00ffcc";
+        ctx.fillStyle = "#ffcc44";
+        ctx.beginPath();
+        ctx.arc(bird.x, bird.y, bird.radius, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle = "#000";
+        ctx.beginPath();
+        ctx.arc(bird.x+3, bird.y-3, 2, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle = "#ff6600";
+        ctx.beginPath();
+        ctx.moveTo(bird.x+12, bird.y);
+        ctx.lineTo(bird.x+22, bird.y-3);
+        ctx.lineTo(bird.x+22, bird.y+3);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      let countdownActive = false;
+      function startCountdown(callback) {
+        let count = 3;
+        const overlay = document.getElementById('countdown-overlay');
+        const numSpan = document.getElementById('countdown-num');
+        overlay.classList.remove('hidden');
+        function update() {
+          if(count === 0) {
+            overlay.classList.add('hidden');
+            if(callback) callback();
+            return;
+          }
+          numSpan.innerText = count;
+          count--;
+          setTimeout(update, 800);
+        }
+        update();
+      }
+
+      function beginGame() {
+        if(animationId) { cancelAnimationFrame(animationId); animationId = null; }
+        gameRunning = false;
+        resetGame();
+        countdownActive = true;
+        startCountdown(() => {
+          countdownActive = false;
+          gameRunning = true;
+          gameLoop();
+        });
+      }
+
+      function gameLoop() {
+        if(!gameRunning) return;
+        animationId = requestAnimationFrame(gameLoop);
+        updateGame();
+      }
+
+      function gameOver() {
+        if(!gameRunning) return;
+        gameRunning = false;
+        cancelAnimationFrame(animationId);
+        animationId = null;
+        const isRecord = addScoreToStats(score);
+        document.getElementById('go-score').innerText = score;
+        document.getElementById('go-best').innerText = playerStats.highScore;
+        const badge = document.getElementById('new-record-badge');
+        if(isRecord && score>0) badge.classList.remove('hidden');
+        else badge.classList.add('hidden');
+        document.getElementById('gameover-overlay').classList.remove('hidden');
+        document.getElementById('saving-indicator').style.display = 'block';
+        setTimeout(() => {
+          document.getElementById('saving-indicator').style.display = 'none';
+        }, 800);
+        updateGameHighScoreUI(score);
+      }
+
+      function stopGameBackToHome() {
+        if(gameRunning) {
+          gameRunning = false;
+          if(animationId) cancelAnimationFrame(animationId);
+          animationId = null;
+        }
+        countdownActive = false;
+        document.getElementById('gameover-overlay').classList.add('hidden');
+        document.getElementById('countdown-overlay').classList.add('hidden');
+        showScreen('home');
+        resizeCanvas();
+      }
+
+      // ======================== LEADERBOARD (Mock) ========================
+      function renderLeaderboard() {
+        const container = document.getElementById('lb-list');
+        container.innerHTML = '<div class="lb-loading">Loading standings...</div>';
+        // Generate mock leaderboard using local stats plus some fictive players
+        setTimeout(() => {
+          const mockPlayers = [
+            { name: "CYBER HAWK", score: 247, games: 89, avatar: "C" },
+            { name: "NEON PHANTOM", score: 198, games: 42, avatar: "N" },
+            { name: playerStats.name, score: playerStats.highScore, games: playerStats.gamesPlayed, avatar: playerStats.avatarInitial, isMe: true },
+            { name: "VOID RUNNER", score: 124, games: 33, avatar: "V" },
+            { name: "FLARE", score: 98, games: 27, avatar: "F" },
+            { name: "ZENITH", score: 76, games: 14, avatar: "Z" }
+          ];
+          mockPlayers.sort((a,b)=>b.score - a.score);
+          container.innerHTML = "";
+          mockPlayers.forEach((p, idx) => {
+            const rank = idx+1;
+            const row = document.createElement('div');
+            row.className = `lb-row ${p.isMe ? 'rank-me' : ''} ${rank===1?'rank-1':rank===2?'rank-2':rank===3?'rank-3':''}`;
+            row.innerHTML = `
+              <div class="lb-rank">${rank}</div>
+              <div class="lb-avatar">${p.avatar}</div>
+              <div class="lb-info">
+                <div class="lb-name">${p.name}${p.isMe ? ' (you)' : ''}</div>
+                <div class="lb-games">🎮 ${p.games} games</div>
+              </div>
+              <div class="lb-score">${p.score}</div>
+            `;
+            container.appendChild(row);
+          });
+        }, 350);
+      }
+
+      // ======================== UI EVENT BINDINGS ========================
+      function bindEvents() {
+        document.getElementById('play-btn')?.addEventListener('click', ()=>{
+          showScreen('game');
+          resizeCanvas();
+          beginGame();
+        });
+        document.getElementById('game-back-btn')?.addEventListener('click', stopGameBackToHome);
+        document.getElementById('restart-btn')?.addEventListener('click', ()=>{
+          document.getElementById('gameover-overlay').classList.add('hidden');
+          beginGame();
+        });
+        document.getElementById('go-home-btn')?.addEventListener('click', stopGameBackToHome);
+        document.getElementById('leaderboard-btn')?.addEventListener('click', ()=>{
+          if(gameRunning) { gameRunning=false; if(animationId) cancelAnimationFrame(animationId); }
+          renderLeaderboard();
+          showScreen('leaderboard');
+        });
+        document.getElementById('leaderboard-page-btn')?.addEventListener('click', ()=>{
+          renderLeaderboard();
+          showScreen('leaderboard');
+        });
+        document.getElementById('lb-back-btn')?.addEventListener('click', ()=>showScreen('home'));
+        canvas?.addEventListener('touchstart', (e)=>{
+          e.preventDefault();
+          if(gameRunning && !countdownActive) {
+            bird.velocity = bird.jumpPower;
+          }
+        });
+        canvas?.addEventListener('mousedown', (e)=>{
+          if(gameRunning && !countdownActive) {
+            bird.velocity = bird.jumpPower;
+          }
+        });
+      }
+
+      // ======================== INITIAL BOOT ========================
+      function init() {
+        loadStats();
+        bindEvents();
+        resizeCanvas();
+        setTimeout(() => {
+          screens.loading.classList.remove('active');
+          screens.home.classList.add('active');
+        }, 1600);
+        if(tg) tg.ready();
+      }
+      init();
+    })();
+  </script>
+</body>
+</html>
